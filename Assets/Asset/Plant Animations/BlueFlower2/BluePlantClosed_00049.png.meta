@@ -66,7 +66,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 100
+  spritePixelsToUnits: 512
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -272,7 +272,13 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      BluePlantClosed_00049_0: -4678510828230745390
+      BluePlantClosed_00049_1: -2115708228766692898
+      BluePlantClosed_00049_2: -909689570749012108
+      BluePlantClosed_00049_3: 8879801895642357369
+      BluePlantClosed_00049_4: 8529444354153314812
+      BluePlantClosed_00049_5: 8406730508542237441
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
