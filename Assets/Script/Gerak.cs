@@ -1,14 +1,14 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class PlayerMoves : MonoBehaviour
+public class PlayerController : MonoBehaviour
 {
+    [Header("Movement")]
     public float speed = 10f;
-    public float jump = 15f;
-
-    private float gerakan;
+    public float jumpPower = 15f;
+    private float horizontal;
+    private bool isFacingRight = true;
     private Rigidbody2D rb;
 
     [Header("Ground & Wall Check")]
@@ -22,52 +22,126 @@ public class PlayerMoves : MonoBehaviour
     private bool isTouchingWall;
     private bool isWallSliding;
 
-    [Header("Wall Slide")]
-    public float wallSlideSpeed = 1f;
+    [Header("Wall Slide & Jump")]
+    public float wallSlideSpeed = 2f;
+    private bool isWallJumping;
+    private float wallJumpDirection;
+    public Vector2 wallJumpPower = new Vector2(8f, 15f);
+    public float wallJumpTime = 0.2f;
+    public float wallJumpDuration = 0.4f;
+    private float wallJumpCounter;
+
+    [Header("Dash")]
+    public float dashPower = 24f;
+    public float dashTime = 0.2f;
+    public float dashCooldown = 1f;
+    private bool canDash = true;
+    private bool isDashing;
+    public TrailRenderer trail;
 
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
     }
 
-    void Update()
+    private void Update()
     {
+        if (isDashing) return;
+
         // Input
-        gerakan = Input.GetAxisRaw("Horizontal");
+        horizontal = Input.GetAxisRaw("Horizontal");
 
         // Flip sprite
-        if (gerakan < 0)
-            transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-        else if (gerakan > 0)
-            transform.rotation = Quaternion.Euler(0f, 0f, 0f);
+        Flip();
 
-        // Movement
-        rb.linearVelocity = new Vector2(gerakan * speed, rb.linearVelocity.y);
-
-        // Check ground and wall
+        // Ground & Wall Check
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer);
         isTouchingWall = Physics2D.OverlapCircle(wallCheck.position, checkRadius, wallLayer);
 
-        // Wall Slide Logic
-        isWallSliding = isTouchingWall && !isGrounded && gerakan != 0;
-
-        if (isWallSliding && rb.linearVelocity.y < 0)
+        // Wall Slide
+        isWallSliding = isTouchingWall && !isGrounded && horizontal != 0;
+        if (isWallSliding && rb.linearVelocity.y < 0f)
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, -wallSlideSpeed);
         }
 
         // Jump
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if (Input.GetButtonDown("Jump"))
         {
-            Jump();
+            if (isGrounded)
+            {
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
+            }
+            else if (isWallSliding)
+            {
+                isWallJumping = true;
+                wallJumpDirection = -Mathf.Sign(transform.localScale.x);
+                rb.linearVelocity = new Vector2(wallJumpDirection * wallJumpPower.x, wallJumpPower.y);
+
+                // Flip character after wall jump
+                if ((wallJumpDirection > 0 && !isFacingRight) || (wallJumpDirection < 0 && isFacingRight))
+                {
+                    Flip();
+                }
+
+                Invoke(nameof(StopWallJump), wallJumpDuration);
+            }
+        }
+
+        // Dash
+        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash)
+        {
+            StartCoroutine(Dash());
         }
     }
 
-    void Jump()
+    private void FixedUpdate()
     {
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jump);
+        if (isDashing) return;
+
+        if (!isWallJumping)
+        {
+            rb.linearVelocity = new Vector2(horizontal * speed, rb.linearVelocity.y);
+        }
     }
 
+    private void Flip()
+    {
+        if ((isFacingRight && horizontal < 0) || (!isFacingRight && horizontal > 0))
+        {
+            isFacingRight = !isFacingRight;
+            Vector3 scale = transform.localScale;
+            scale.x *= -1;
+            transform.localScale = scale;
+        }
+    }
+
+    private void StopWallJump()
+    {
+        isWallJumping = false;
+    }
+
+    private IEnumerator Dash()
+    {
+        canDash = false;
+        isDashing = true;
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0f;
+        float dashDirection = isFacingRight ? 1f : -1f;
+        rb.linearVelocity = new Vector2(dashDirection * dashPower, 0f);
+        trail.emitting = true;
+
+        yield return new WaitForSeconds(dashTime);
+
+        trail.emitting = false;
+        rb.gravityScale = originalGravity;
+        isDashing = false;
+
+        yield return new WaitForSeconds(dashCooldown);
+        canDash = true;
+    }
+
+    // Interaksi dengan platform & death zone
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.CompareTag("MovingPlatform"))
@@ -98,9 +172,9 @@ public class PlayerMoves : MonoBehaviour
         StartCoroutine(RestartLevel());
     }
 
-    IEnumerator RestartLevel()
+    private IEnumerator RestartLevel()
     {
-        yield return new WaitForSeconds(1.0f);
+        yield return new WaitForSeconds(1f);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
