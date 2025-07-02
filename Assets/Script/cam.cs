@@ -1,42 +1,81 @@
-using System.Collections;
-// using System.Collections.Generic;
-using UnityEngine; //penting karena semua komponen Unity seperti Transform, MonoBehaviour, Vector3, dll, ada di namespace ini
+using UnityEngine;
 
-//Ini adalah deklarasi kelas yang turunan dari MonoBehaviour, 
-//artinya ini adalah script yang bisa ditempel ke GameObject di Unity.
-public class CameraFollow : MonoBehaviour 
+public class CameraFollow : MonoBehaviour
 {
-    // Ini adalah jarak antara kamera dan target (misalnya karakter pemain). 
-    // Kamera akan mengikuti target tetapi tetap berada di belakangnya sejauh -10 di sumbu Z (umumnya untuk 2D game).
-    private Vector3 offset = new Vector3(0f,0f,-10f); 
-
-    //Waktu yang dibutuhkan untuk mencapai posisi target. 
-    //Nilai ini menentukan seberapa halus perpindahan kamera.
-    private float smoothTime = 0.25f;
-
-    // Digunakan oleh fungsi SmoothDamp untuk menghitung gerakan halus.
-    private Vector3 velocity = Vector3.zero;
-
-    //Referensi ke objek yang akan diikuti kamera. 
-    //Menggunakan [SerializeField] agar tetap private tapi bisa di-assign dari Unity Inspector.
+    // Referensi ke objek yang akan diikuti kamera.
     [SerializeField] private Transform target;
 
+    // Jarak default kamera dari target (terutama untuk sumbu Z).
+    private Vector3 offset = new Vector3(0f, 0f, -10f);
 
-    // Start is called before the first frame update
-    void Start()
+    // Waktu yang dibutuhkan untuk mencapai posisi target.
+    private float smoothTime = 0.25f;
+    private Vector3 velocity = Vector3.zero;
+
+    // --- BARU: Variabel untuk Batas Panggung ---
+    [Header("Stage Boundaries")]
+    [Tooltip("Koordinat X dan Y dari sudut kiri-bawah panggung.")]
+    [SerializeField] private Vector2 stageBoundsMin;
+
+    [Tooltip("Koordinat X dan Y dari sudut kanan-atas panggung.")]
+    [SerializeField] private Vector2 stageBoundsMax;
+    
+    // Variabel untuk menyimpan komponen kamera
+    private Camera cam;
+
+    void Awake()
     {
-        
+        // Mendapatkan komponen Kamera yang ada di GameObject yang sama
+        cam = GetComponent<Camera>();
     }
 
-    // Update is called once per frame
-    void Update()
+    // Gunakan LateUpdate untuk pergerakan kamera agar lebih mulus
+    void LateUpdate()
     {
-        //Setiap frame, kamera menghitung posisi target + offset (targetPosition).
-        Vector3 targetPosition = target. position + offset;
+        if (target == null || cam == null)
+        {
+            return; // Keluar jika target atau kamera tidak ada
+        }
 
-        //SmoothDamp digunakan untuk membuat gerakan kamera menuju targetPosition secara halus, tanpa gerakan mendadak.
-        //ref velocity menyimpan kecepatan agar transisi tetap konsisten.
-        //smoothTime menentukan seberapa cepat atau lambat transisi itu terjadi.
-        transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
+        // 1. Hitung posisi tujuan awal (target + offset)
+        Vector3 targetPosition = target.position + offset;
+
+        // 2. Hitung posisi baru yang sudah dihaluskan (smooth)
+        // Kita belum terapkan ini, hanya menghitungnya sebagai kandidat posisi.
+        Vector3 newPos = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
+
+        // 3. Hitung batas efektif untuk posisi kamera berdasarkan ukuran viewport
+        // Ini memastikan Tepi Kamera yang berhenti di batas, bukan titik tengahnya.
+        float cameraHalfHeight = cam.orthographicSize;
+        float cameraHalfWidth = cameraHalfHeight * cam.aspect;
+
+        // 4. Jepit (Clamp) posisi kamera agar tidak keluar dari batas panggung
+        float clampedX = Mathf.Clamp(newPos.x, stageBoundsMin.x + cameraHalfWidth, stageBoundsMax.x - cameraHalfWidth);
+        float clampedY = Mathf.Clamp(newPos.y, stageBoundsMin.y + cameraHalfHeight, stageBoundsMax.y - cameraHalfHeight);
+
+        // 5. Terapkan posisi akhir yang sudah dijepit
+        transform.position = new Vector3(clampedX, clampedY, newPos.z);
+    }
+
+    // --- BARU: Menggambar Gizmo untuk visualisasi Batas Panggung ---
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.green; // Atur warna gizmo menjadi hijau
+
+        // Hitung ukuran dan pusat dari kotak batas
+        Vector3 center = new Vector3(
+            stageBoundsMin.x + (stageBoundsMax.x - stageBoundsMin.x) / 2,
+            stageBoundsMin.y + (stageBoundsMax.y - stageBoundsMin.y) / 2,
+            0f
+        );
+
+        Vector3 size = new Vector3(
+            stageBoundsMax.x - stageBoundsMin.x,
+            stageBoundsMax.y - stageBoundsMin.y,
+            1f
+        );
+
+        // Gambar kotak transparan (wireframe) yang merepresentasikan batas panggung
+        Gizmos.DrawWireCube(center, size);
     }
 }
